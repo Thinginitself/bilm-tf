@@ -693,21 +693,20 @@ def train(options, data, n_gpus, tf_save_dir, tf_log_dir,
             initializer=tf.constant_initializer(0.0), trainable=False)
         norm_summaries = []
         for k in range(n_gpus):
-            with tf.device('/gpu:%d' % k):
-                with tf.variable_scope('lm', reuse=k > 0):
-                    # calculate the loss for one model replica and get
-                    #   lstm states
-                    model = LanguageModel(options, True)
-                    loss = model.total_loss
-                    models.append(model)
-                    # get gradients
-                    grads = opt.compute_gradients(
-                        loss * options['unroll_steps'],
-                        aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE,
-                    )
-                    tower_grads.append(grads)
-                    # keep track of loss across all GPUs
-                    train_perplexity += loss
+            with tf.variable_scope('lm', reuse=k > 0):
+                # calculate the loss for one model replica and get
+                #   lstm states
+                model = LanguageModel(options, True)
+                loss = model.total_loss
+                models.append(model)
+                # get gradients
+                grads = opt.compute_gradients(
+                    loss * options['unroll_steps'],
+                    aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE,
+                )
+                tower_grads.append(grads)
+                # keep track of loss across all GPUs
+                train_perplexity += loss
 
         print_variable_summary()
 
@@ -829,9 +828,10 @@ def train(options, data, n_gpus, tf_save_dir, tf_log_dir,
         init_state_values = sess.run(init_state_tensors, feed_dict=feed_dict)
 
         t1 = time.time()
+        print(t1)
         data_gen = data.iter_batches(batch_size * n_gpus, unroll_steps)
         for batch_no, batch in enumerate(data_gen, start=1):
-
+            print(batch_no)
             # slice the input in the batch for the feed_dict
             X = batch
             feed_dict = {t: v for t, v in zip(
@@ -961,7 +961,7 @@ def test(options, ckpt_file, data, batch_size=256):
 
     config = tf.ConfigProto(allow_soft_placement=True)
     with tf.Session(config=config) as sess:
-        with tf.device('/gpu:0'), tf.variable_scope('lm'):
+        with tf.device('/cpu:0'), tf.variable_scope('lm'):
             test_options = dict(options)
             # NOTE: the number of tokens we skip in the last incomplete
             # batch is bounded above batch_size * unroll_steps
